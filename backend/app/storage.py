@@ -1,6 +1,5 @@
 import boto3
 from botocore.client import Config
-
 from app.config import get_settings
 
 
@@ -20,8 +19,8 @@ def raw_key(video_id: str) -> str:
     return f"videos/{video_id}/raw.mp4"
 
 
-def artifact_key(video_id: str, pipeline_version: str, name: str) -> str:
-    return f"videos/{video_id}/{pipeline_version}/{name}"
+def artifact_key(video_id: str, stage: str, stage_version: str, name: str) -> str:
+    return f"videos/{video_id}/{stage}/{stage_version}/{name}"
 
 
 def presigned_put(key: str, content_type: str, expires: int = 3600) -> str:

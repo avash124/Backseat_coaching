@@ -1,0 +1,15 @@
+# Registry of external training sets. One entry per pinned dataset version.
+#
+# Every entry records its license: this is a commercial product, and Roboflow
+# Universe datasets range from MIT/CC BY 4.0 to unspecified. An unspecified license
+# is not a permissive one — resolve it before the data trains a shipped model.
+#
+# - name:        basketball-players-xyz
+#   source:      roboflow
+#   workspace:   ...
+#   project:     ...
+#   version:     3            # pinned; never "latest"
+#   license:     CC-BY-4.0
+#   classes:     [player, ball, referee, hoop]
+#   domain:      broadcast    # broadcast | tripod | mixed  -- see taxonomy.py notes
+#   notes:       ...

@@ -15,6 +15,15 @@ browser polls /jobs/{id} -> /videos/{id}/results renders fake plays
    ```
    docker compose -f infra/docker-compose.yml up -d
    ```
+   **Without Docker (current dev box):** a native PostgreSQL 18 service already
+   holds port 5432, so create the role/database the compose file would have made —
+   credentials deliberately match, so switching to Docker later needs no `.env` change:
+   ```
+   & "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -c "CREATE ROLE nextup LOGIN PASSWORD 'nextup'"
+   & "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -c "CREATE DATABASE nextup OWNER nextup"
+   ```
+   Redis and MinIO still need Docker (or local installs) before the worker and
+   uploads work — the schema and migrations do not.
 2. Configure env:
    ```
    cp .env.example .env     # defaults already point at the compose services
@@ -23,6 +32,15 @@ browser polls /jobs/{id} -> /videos/{id}/results renders fake plays
    ```
    uv sync
    ```
+   Windows notes:
+   - The interpreter is pinned in `.python-version` (3.13.15). Do **not** let uv
+     build the venv on the Windows Store Python
+     (`...\WindowsApps\PythonSoftwareFoundation.Python.3.13_...`) — it produces a
+     venv with no `pip` and no activate scripts. A bare `uv sync --python 3.13`
+     selects exactly that build, which is why the pin is an exact patch version.
+   - If `uv sync` fails with `invalid peer certificate: UnknownIssuer`, local TLS
+     inspection (antivirus/corporate proxy) is intercepting PyPI. Add
+     `--system-certs`, or set `UV_NATIVE_TLS=1` once for the shell.
 4. Create the schema:
    ```
    uv run alembic revision --autogenerate -m "init"

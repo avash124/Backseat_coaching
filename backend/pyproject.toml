@@ -19,11 +19,25 @@ dependencies = [
 ]
 
 [dependency-groups]
+cv = [
+    "av==15.1.0",
+    "boxmot==25.0.0",
+    "opencv-python==4.14.0.94",
+    "torch==2.8.0",
+    "torchvision==0.23.0",
+    "ultralytics==8.4.155",
+]
 dev = [
     "pytest>=8.3",
     "ruff>=0.7",
     "flower>=2.0",
 ]
+remote = [
+    "modal==1.5.4",
+]
+
+[tool.uv.dependency-groups]
+cv = {requires-python = ">=3.11,<3.14"}
 
 [tool.ruff]
 line-length = 100
