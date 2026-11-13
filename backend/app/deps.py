@@ -1,6 +1,7 @@
 from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
 from app.auth import current_user_id
 from app.db import get_db
 from app.models import User

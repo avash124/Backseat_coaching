@@ -1,4 +1,9 @@
-"""Modal inference runtime. Match the detector versions used in train_modal.py."""
+"""Modal inference runtime. Match the detector versions used in remote/train.py.
+
+Post-processing uses scipy (Hungarian stitching), installed as an ultralytics
+dependency. ReID checkpoints are uploaded to the weights volume by infer.py, so
+the image needs no network access to BoxMOT's model downloads.
+"""
 
 import modal
 

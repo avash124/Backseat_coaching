@@ -1,0 +1,21 @@
+# PUBLIC validation split of the prepared eBAR dataset (NBA broadcast footage).
+#
+# DIAGNOSTIC ONLY: none of these groups is quarantined, and the camera domain differs from our
+# uploads. evaluate.py refuses this set without --diagnostic and marks the report diagnostic.
+# Use it for sanity checks during training, never for gate or promotion decisions.
+name: ebard-val
+description: >
+  eBAR players_v1 val split: 6 whole NBA games x 30 frames, player/referee labels remapped by
+  tracking/datasets/prepare_ebard.py.
+groups:
+  - det-vs-gsw-0022400919
+  - gsw-vs-nyk-0022400885
+  - lac-vs-lal-0022400874
+  - mem-vs-nop-0022400923
+  - nyk-vs-nop-0022400384
+  - tor-vs-orl-0022400870
+images: ../datasets/ebard/players_v1/val/images
+labels: ../datasets/ebard/players_v1/val/labels
+labels_status: corrected
+classes: [player, referee]
+frame_names: loose

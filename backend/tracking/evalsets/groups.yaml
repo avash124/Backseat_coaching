@@ -1,0 +1,51 @@
+# Group registry: the source footage each group id covers.
+#
+# `python -m tracking.labeling sample` refuses to sample a registered group from a different
+# video (by sha256) or outside its time span, so a typo cannot pull eval frames into a
+# training batch. Times are seconds from the first decoded frame. start_s is inclusive and
+# end_s exclusive; null means the end of the video. Frame ranges are 0-based decoded frame
+# indices (inclusive), listed for humans.
+#
+# Game g001: "Basketball Game(1)_cut.mp4" at the repo root (not committed). It is 1920x1080
+# at 30 fps, 9256 frames, 308.53 s, from one fixed camera. The boundary leaves the last third
+# for evaluation. The 5 s guard band (200-205 s, frames 6000-6149) belongs to neither group,
+# so no pair of near-identical frames straddles the train/eval boundary.
+#
+# tracking/runs/inputs/basketball-first30s.mp4 is bit-identical to g001 frames 0-899 (checked
+# frame by frame), so the 30 s tracking clip and its tracks.json lie INSIDE g001-a.
+groups:
+  g001-a:
+    video: "Basketball Game(1)_cut.mp4"
+    video_sha256: 9b742f2a5c6ee1e3cd4edd99e31667e47e854b746d31ec52bd9d38a2218da780
+    start_s: 0.0
+    end_s: 200.0
+    frames: [0, 5999]
+    use: training candidates
+  g001-b:
+    video: "Basketball Game(1)_cut.mp4"
+    video_sha256: 9b742f2a5c6ee1e3cd4edd99e31667e47e854b746d31ec52bd9d38a2218da780
+    start_s: 205.0
+    end_s: null
+    frames: [6150, 9255]
+    use: evaluation (quarantined)
+#
+# Game g002: "videoplayback.mp4" at the repo root (not committed). It is 640x360 at 29.97 fps,
+# 107,939 frames, 3601.58 s: one full high-school game from an operated camera that pans, with
+# a scoreboard overlay (a streamed production, not a fixed camera). A different gym, teams and
+# camera from g001. Its rights are unconfirmed (a third-party stream): internal use only until
+# cleared. The boundary leaves the last third for evaluation, with a 30 s guard band
+# (2400-2430 s) that belongs to neither group.
+  g002-a:
+    video: "videoplayback.mp4"
+    video_sha256: a26c71b1cbe56c2131c83681618b8671c71c4d89636e2758649fa87d608855da
+    start_s: 0.0
+    end_s: 2400.0
+    frames: [0, 71928]
+    use: training candidates
+  g002-b:
+    video: "videoplayback.mp4"
+    video_sha256: a26c71b1cbe56c2131c83681618b8671c71c4d89636e2758649fa87d608855da
+    start_s: 2430.0
+    end_s: null
+    frames: [72828, 107938]
+    use: evaluation (quarantined)

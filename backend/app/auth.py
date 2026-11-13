@@ -32,7 +32,7 @@ def current_user_id(
             audience=settings.supabase_jwt_aud,
             options={"verify_at_hash": False},
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise HTTPException(status_code=401, detail="Invalid token") from exc
 
     sub = claims.get("sub")

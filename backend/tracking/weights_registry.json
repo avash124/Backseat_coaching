@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "models": [
+    {
+      "name": "players-v1",
+      "role": "player-detector",
+      "status": "promoted",
+      "sha256": "8ea31d1eb37d91090974a61fa651d58ab91591e31addb2d5acd028d4764ad5e2",
+      "path": "tracking/weights/players-v1.pt",
+      "volume_key": null,
+      "s3_key": null,
+      "imgsz": 1280,
+      "classes": [
+        "player",
+        "referee"
+      ],
+      "base_model": "yolo26s.pt",
+      "dataset_sha256": "9484779986800943513c4e143d37fe686260641cb6fc637efa20f6919ecae32a",
+      "dataset_manifest": "../datasets/ebard/players_v1/dataset_manifest.json",
+      "training_run_id": "nextup-checkpoints:/players-v1",
+      "weights_manifest": null,
+      "eval_report": null,
+      "ultralytics_version": "8.4.155",
+      "created_at": "2026-09-19T14:40:19+00:00",
+      "promoted_at": null,
+      "promoted_by": null,
+      "notes": "Grandfathered: already the pipeline default (tracking/config.py DEFAULT_WEIGHTS) before this registry existed, so promoted without an own-footage eval report. Trained by the retired train_modal.py (H100, batch 4, imgsz 1280, 60 epochs, optimizer=auto -> MuSGD lr0 0.01, seed 42, close_mosaic 10, flipud 0) on eBAR players_v1 (hf:GabrieleGiudici/E-BARD-detection@00563215490c9a9642797b1495ea178535b3f59c; labels CC BY 4.0, frame rights unresolved (NBA broadcast) — internal experiments only, no shipped weights without legal sign-off; see sources.yaml). The players_v1 manifest itself still records source_version/source_license null. Checkpoint metrics are on eBAR's public val split (diagnostic only): mAP50-95 0.780, mAP50 0.956, P 0.955, R 0.940."
+    }
+  ]
+}

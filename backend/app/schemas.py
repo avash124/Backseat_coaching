@@ -1,17 +1,43 @@
 import uuid
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CreateUploadRequest(BaseModel):
     filename: str
     content_type: str = "video/mp4"
+    size_bytes: int = Field(gt=0)
 
 
 class CreateUploadResponse(BaseModel):
     video_id: uuid.UUID
-    upload_url: str
     storage_key: str
+    part_size: int
+    part_count: int
+
+
+class PresignPartsRequest(BaseModel):
+    part_numbers: list[int] = Field(max_length=100)
+
+
+class PartUrl(BaseModel):
+    part_number: int
+    url: str
+
+
+class PresignPartsResponse(BaseModel):
+    parts: list[PartUrl]
+
+
+class UploadedPart(BaseModel):
+    part_number: int
+    size_bytes: int
+
+
+class UploadPartsResponse(BaseModel):
+    part_size: int
+    part_count: int
+    uploaded: list[UploadedPart]
 
 
 class ConfirmUploadResponse(BaseModel):

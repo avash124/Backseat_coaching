@@ -1,0 +1,22 @@
+# Groups that must never enter any training set.
+#
+# A group is the split unit: a game, or a game segment while we only have one game. Group ids
+# match [a-z0-9-]+ and prefix every frame file name ({group_id}_{frame_index:07d}.jpg), so the
+# dataset builder can refuse quarantined frames by file name alone. tracking/evaluate.py scores
+# a non-diagnostic report only on eval sets whose groups are all listed here.
+#
+# Add a group here BEFORE labeling it. Never remove one: once a group has been used to judge
+# models, training on it makes every later comparison against it meaningless.
+#
+# g001-b - stopgap held-out segment while there is only one game: the last third of g001
+#   (t >= 205.0 s, frames 6150-9255 of "Basketball Game(1)_cut.mp4"; see groups.yaml). It
+#   shares players, uniforms, gym and camera with the training segment g001-a, so it measures
+#   generalization across time within one game, NOT across games or teams. Supplement it with
+#   whole held-out games (PLAN.md M0 asks for >= 3) as soon as more footage exists.
+#
+# g002-b - the last third of game g002 (t >= 2430.0 s of "videoplayback.mp4"; see
+#   groups.yaml): an operated, panning camera at 360p. It shares teams and gym with the
+#   training segment g002-a, so it also measures within-game generalization only.
+groups:
+  - g001-b
+  - g002-b

@@ -1,0 +1,20 @@
+# Detection eval set: g002-b, the quarantined last third of game g002 (batch 1).
+#
+# The labels are uncorrected model PRE-LABELS until a human corrects them in CVAT. Until
+# then, evaluate.py runs on this set only with --diagnostic, and those scores measure
+# agreement with players-v1, not accuracy. After `labeling import-cvat`, point `labels:` at
+# .../g002-b/corrected/labels and set labels_status: corrected.
+#
+# When correcting: bench players, coaches and spectators stay unlabeled; drop the frames
+# after the final buzzer, where fans are on the court.
+name: g002-b
+description: >
+  Every frame of g002-b that the >=4 s spacing rule allows (293 frames, 2430.0-3601.6 s),
+  640x360 from an operated, panning camera with striped-shirt referees. The teams and gym
+  are also in training group g002-a, so this measures within-game generalization only.
+  Rights to the footage are unconfirmed: internal evaluation only.
+groups: [g002-b]
+images: ../datasets/own/labeling/g002-batch1/g002-b/images
+labels: ../datasets/own/labeling/g002-batch1/g002-b/labels
+labels_status: prelabel
+classes: [player, referee]

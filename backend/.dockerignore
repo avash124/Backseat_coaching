@@ -1,0 +1,15 @@
+# Allowlist: ignore everything, then send only what the Dockerfile copies.
+# This keeps .env, .modal.toml, .venv, caches, uv.lock, and the multi-GB
+# tracking/weights and tracking/runs out of the build context and the image.
+# A new file stays out until it is listed here.
+*
+!pyproject.toml
+!alembic.ini
+!alembic
+!app
+
+# Re-exclude generated and secret files inside the allowed directories.
+**/__pycache__
+**/*.py[cod]
+**/.env
+**/.env.*

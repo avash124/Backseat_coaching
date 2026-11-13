@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,7 +15,7 @@ router = APIRouter(prefix="/videos", tags=["results"])
 
 @router.get("/{video_id}/results", response_model=ResultsResponse)
 def get_results(
-    video_id: str,
+    video_id: uuid.UUID,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> ResultsResponse:

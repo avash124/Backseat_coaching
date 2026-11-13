@@ -1,0 +1,150 @@
+name: CI
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend lint, test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend/next-up
+
+    steps:
+      - name: Get the repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/next-up/package-lock.json
+
+      - name: Install dependencies from the lockfile
+        run: npm ci
+
+      - name: Lint frontend
+        run: npm run lint
+
+      - name: Run frontend unit tests
+        run: npm run test
+
+      - name: Build frontend for production
+        run: npm run build
+
+  api:
+    name: Backend lint, migrations and API tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nextup
+          POSTGRES_PASSWORD: nextup
+          POSTGRES_DB: nextup
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nextup -d nextup"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Migrations run against `nextup`; the API tests use their own `nextup_test`.
+      DATABASE_URL: postgresql+psycopg://nextup:nextup@localhost:5432/nextup
+      TEST_DATABASE_URL: postgresql+psycopg://nextup:nextup@localhost:5432/nextup_test
+      # app.config.Settings requires these. Nothing in this job connects to them:
+      # the tests stub object storage and Celery.
+      REDIS_URL: redis://localhost:6379/0
+      S3_ENDPOINT_URL: http://localhost:9000
+      S3_ACCESS_KEY: ci-not-a-secret
+      S3_SECRET_KEY: ci-not-a-secret
+      S3_BUCKET: nextup
+
+    steps:
+      - name: Get the repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.12.0"
+          working-directory: backend
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+          cache-suffix: api
+
+      - name: Create the Python environment
+        run: uv venv
+
+      - name: Install API and test dependencies
+        run: uv pip install -r pyproject.toml --group dev
+
+      - name: Lint backend
+        run: uv run --no-sync python -m ruff check app tests tracking
+
+      - name: Create the test database
+        run: >-
+          docker exec ${{ job.services.postgres.id }}
+          createdb -U nextup nextup_test
+
+      - name: Apply migrations to a clean database
+        run: uv run --no-sync alembic upgrade head
+
+      - name: Run API tests
+        run: uv run --no-sync python -m pytest tests -q
+
+  tracking:
+    name: Tracking tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Get the repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.12.0"
+          working-directory: backend
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+          cache-suffix: tracking
+
+      - name: Create the Python environment
+        run: uv venv
+
+      - name: Install backend and test dependencies
+        run: uv pip install -r pyproject.toml --group dev --group cv --torch-backend cpu
+
+      - name: Run tracking tests
+        run: uv run --no-sync python -m pytest tracking/tests -q

@@ -15,8 +15,14 @@ services:
     ports:
       - "6379:6379"
 
+  # minio/minio and minio/mc are no longer published (Docker Hub repos deleted,
+  # quay.io needs a login). Silo is the community fork of the MinIO server; it
+  # keeps the MINIO_* variables, the `server` command and the data format.
+  # CORS: with no bucket CORS rule set, the server allows every origin
+  # (MINIO_API_CORS_ALLOW_ORIGIN defaults to "*"), so the browser can PUT
+  # upload parts from http://localhost:3000 with no extra setting.
   minio:
-    image: minio/minio
+    image: pgsty/silo:RELEASE.2026-11-09T00-00-00Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minio
@@ -27,9 +33,9 @@ services:
     volumes:
       - miniodata:/data
 
-  # one-shot: create the bucket + allow the frontend origin to PUT
+  # one-shot: create the bucket + allow anonymous GETs (used with S3_PUBLIC_URL)
   createbucket:
-    image: minio/mc
+    image: pgsty/mc:RELEASE.2026-11-09T00-00-00Z
     depends_on:
       - minio
     entrypoint: >

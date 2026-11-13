@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -11,7 +13,7 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 @router.get("/{job_id}", response_model=JobStatusResponse)
 def get_job(
-    job_id: str,
+    job_id: uuid.UUID,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> JobStatusResponse:

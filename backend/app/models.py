@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    BigInteger,
     DateTime,
     ForeignKey,
     Index,
@@ -13,7 +14,6 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
-
 
 
 def _uuid() -> uuid.UUID:
@@ -38,11 +38,17 @@ class Video(Base):
         ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
     storage_key: Mapped[str] = mapped_column(String)
+    # S3 multipart upload id; only meaningful while status is "uploading".
+    upload_id: Mapped[str | None] = mapped_column(String)
+    # Fixed when the upload is created, so a config change cannot shift the part
+    # boundaries of an upload that is resumed later.
+    part_size: Mapped[int | None] = mapped_column()
     filename: Mapped[str | None] = mapped_column(String)
     content_type: Mapped[str | None] = mapped_column(String)
-    # uploading -> uploaded -> processing -> done | failed
+    # uploading -> processing -> done | failed
     status: Mapped[str] = mapped_column(String, default="uploading", index=True)
-    size_bytes: Mapped[int | None] = mapped_column()
+    # Declared by the client at create; confirm checks the uploaded parts add up to it exactly.
+    size_bytes: Mapped[int | None] = mapped_column(BigInteger)
     duration_s: Mapped[float | None] = mapped_column()
     fps: Mapped[float | None] = mapped_column()
     width: Mapped[int | None] = mapped_column()

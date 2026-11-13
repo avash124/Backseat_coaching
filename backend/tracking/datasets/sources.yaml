@@ -1,15 +1,70 @@
 # Registry of external training sets. One entry per pinned dataset version.
+# Loaded and validated by tracking/datasets/sources.py.
 #
 # Every entry records its license: this is a commercial product, and Roboflow
 # Universe datasets range from MIT/CC BY 4.0 to unspecified. An unspecified license
 # is not a permissive one — resolve it before the data trains a shipped model.
+# License is a filter applied BEFORE download: roboflow.py refuses to pull an entry
+# with license_status "unknown" unless explicitly overridden, and warns on "restricted".
+#   license_status: permissive  -> may train shipped weights
+#                   restricted  -> internal experiments only (e.g. eBAR: frame rights)
+#                   unknown     -> do not download
 #
+# Fields:
+#   name:     unique id, also the prefix of prepared dataset dirs
+#   source:   roboflow | huggingface-archive
+#   remap:    key of the class remap table in taxonomy.SOURCE_REMAPS
+#   classes:  source class names, in the export's id order
+#   domain:   broadcast | tripod | mixed  (justifies sample weighting in merge.py)
+#   roboflow: workspace, project, version (pinned; never "latest"), optional
+#             group_pattern (regex with a `group` named group, applied to the original
+#             file stem, to recover game ids for group-wise splits)
+#
+# Template:
 # - name:        basketball-players-xyz
 #   source:      roboflow
-#   workspace:   ...
-#   project:     ...
-#   version:     3            # pinned; never "latest"
+#   roboflow:
+#     workspace: some-workspace
+#     project:   basketball-players-xyz
+#     version:   3            # pinned; never "latest"
+#     group_pattern: '^(?P<group>[a-z0-9-]+)_\d+'   # optional
+#   version:     3
 #   license:     CC-BY-4.0
+#   license_status: permissive
+#   remap:       basketball-players-xyz   # add a table to taxonomy.SOURCE_REMAPS first
 #   classes:     [player, ball, referee, hoop]
-#   domain:      broadcast    # broadcast | tripod | mixed  -- see taxonomy.py notes
+#   domain:      broadcast
 #   notes:       ...
+
+sources:
+  - name: ebard
+    source: huggingface-archive
+    repo: GabrieleGiudici/E-BARD-detection
+    url: https://huggingface.co/datasets/GabrieleGiudici/E-BARD-detection
+    # Pinned repo commit; matches datasets/ebard/.cache/huggingface/download/all.zip.metadata,
+    # whose etag is the archive sha256 below (verified against the local all.zip).
+    revision: 00563215490c9a9642797b1495ea178535b3f59c
+    version: 00563215490c9a9642797b1495ea178535b3f59c
+    archive: all.zip
+    archive_sha256: 4b0a5ef8fd25565714e6b36a7020bc68b1cc2765afdc82a3b3d7a099e5c2ab81
+    license: >-
+      labels CC BY 4.0; frame rights unresolved (NBA broadcast) — internal experiments
+      only, no shipped weights without legal sign-off
+    license_status: restricted
+    citation: >-
+      Giudici et al. (Univ. of Brescia), "E-BARD: A Multi-Task Extension of the Basketball
+      Action Recognition Dataset"; parent dataset BARD, Computer Vision and Image
+      Understanding (2026), art. 104713. Attribution required (CC BY 4.0).
+    remap: ebard
+    classes: [basketball, hoop, player, referee]
+    domain: broadcast
+    prepared:
+      - players_v1   # player, referee — trained players-v1.pt
+      - full_v1      # player, referee, basketball, hoop — ball/hoop work (M5)
+    notes: >-
+      Labels license is CC BY 4.0 (dataset card, README, LICENSE.txt), but the frames are
+      NBA broadcast video downloaded from nba.com with no stated NBA rights. NBA broadcast
+      frames, 1280x720, 60 games named {team}-vs-{team}-{nba game id}; our whole-game split
+      is 1,440/180/180 images. The YOLO export's data.yaml swaps its val/test paths;
+      prepare_ebard ignores the export splits and re-splits by whole game. Public broadcast
+      domain: diagnostic and pretraining only, never the product evaluation set.

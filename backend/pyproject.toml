@@ -29,8 +29,16 @@ cv = [
 ]
 dev = [
     "pytest>=8.3",
-    "ruff>=0.7",
+    "ruff==0.16.3",
     "flower>=2.0",
+    {include-group = "eval"},
+]
+# tracking/evaluate.py: COCO AP and TrackEval's reference HOTA/CLEAR/Identity metrics.
+# trackeval 1.3.0 is the PyPI-packaged fork of JonathonLuiten/TrackEval: its metric code is
+# upstream's apart from numpy>=1.24 fixes (np.float -> float); upstream master breaks on numpy 2.
+eval = [
+    "pycocotools==2.0.11",
+    "trackeval==1.3.0",
 ]
 remote = [
     "modal==1.5.4",
@@ -41,6 +49,14 @@ cv = {requires-python = ">=3.11,<3.14"}
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI resolves these per request; they are not shared mutable defaults.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header"]
+
+[tool.ruff.lint.isort]
+# backend/alembic/ is the migrations folder, not the package.
+known-third-party = ["alembic"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

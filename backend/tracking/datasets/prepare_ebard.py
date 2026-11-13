@@ -1,37 +1,67 @@
-"""Prepare the downloaded eBAR YOLO export for the player/referee experiment.
+"""Prepare the downloaded eBAR YOLO export for detector training.
 
-Run from backend: python -m tracking.datasets.prepare_ebard
-The original export is unchanged. The destination must not already exist.
+Run from backend:
+    python -m tracking.datasets.prepare_ebard                       # players_v1 (player, referee)
+    python -m tracking.datasets.prepare_ebard --classes player,referee,basketball,hoop \
+        --destination ../datasets/ebard/full_v1 \
+        --source-version "hf:GabrieleGiudici/E-BARD-detection@00563215490c9a9642797b1495ea178535b3f59c" \
+        --license "labels CC BY 4.0; frame rights unresolved (NBA broadcast) — internal experiments only, no shipped weights without legal sign-off"
+
+The original export is unchanged. The destination must not already exist. Classes go
+through `taxonomy.py` (source table "ebard"); output ids follow the selected classes in
+canonical order, so the default reproduces players_v1 byte for byte.
+
+The export's own train/val/test assignment is ignored (its data.yaml even swaps the val
+and test paths): every frame is pooled and re-split by whole game, 80/10/10.
 Public validation/test images are diagnostic only; promotion needs our own footage.
+`--source-version` / `--license` are recorded verbatim in the manifest (default null, with a
+loud warning). The verified eBAR values are in sources.yaml and shown above: labels are
+CC BY 4.0 but the NBA broadcast frames have no stated rights, so weights trained on this
+data are internal experiments only until legal sign-off.
 """
 
 import argparse
-import hashlib
-import json
-import math
-import random
 import shutil
 from collections import Counter
 from pathlib import Path
 
-import yaml
+from tracking.datasets import taxonomy
+from tracking.datasets.common import (
+    IMAGE_SUFFIXES,
+    data_yaml_text,
+    dataset_sha256,
+    load_data_yaml,
+    remap_label_text,
+    warn_missing_provenance,
+    write_manifest,
+)
+from tracking.datasets.splits import load_quarantine, split_groups
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+SOURCE = "ebard"
 SOURCE_NAMES = ["basketball", "hoop", "player", "referee"]
-TARGET_NAMES = ["player", "referee"]
-CLASS_MAP = {0: None, 1: None, 2: 0, 3: 1}
-IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
+TARGET_NAMES = list(taxonomy.DEFAULT_CLASSES)
 
 
-def prepare(source: Path, destination: Path, seed: int = 42) -> dict:
+def prepare(
+    source: Path,
+    destination: Path,
+    seed: int = 42,
+    classes: tuple[str, ...] = taxonomy.DEFAULT_CLASSES,
+    source_version: str | None = None,
+    license: str | None = None,
+    quarantine_path: Path | None = None,
+) -> dict:
     source = source.resolve()
     destination = destination.resolve()
     if destination.exists():
         raise FileExistsError(f"Refusing to overwrite {destination}")
 
-    config = yaml.safe_load((source / "data.yaml").read_text(encoding="utf-8"))
+    config = load_data_yaml(source)
     if config["names"] != SOURCE_NAMES:
-        raise ValueError("Source class order changed; review CLASS_MAP before proceeding")
+        raise ValueError("Source class order changed; review the eBAR remap before proceeding")
+    names = list(taxonomy.select_classes(classes))
+    class_map = taxonomy.class_map(SOURCE, SOURCE_NAMES, names)
 
     records = {}
     excluded = []
@@ -51,46 +81,18 @@ def prepare(source: Path, destination: Path, seed: int = 42) -> dict:
             if not game or not separator or not frame.isdigit():
                 raise ValueError(f"Cannot infer game ID from {image.name}")
             label = label_dir / f"{image.stem}.txt"
-            raw_labels = label.read_text(encoding="utf-8")
-            remapped = []
-            counts = Counter()
-            for line_number, line in enumerate(raw_labels.splitlines(), 1):
-                if not line.strip():
-                    continue
-                fields = line.split()
-                if len(fields) != 5:
-                    raise ValueError(f"Expected five label fields: {label}:{line_number}")
-                class_id = int(fields[0])
-                if class_id not in CLASS_MAP:
-                    raise ValueError(f"Unknown class {class_id}: {label}:{line_number}")
-                coordinates = [float(value) for value in fields[1:]]
-                if not all(math.isfinite(value) and 0 <= value <= 1 for value in coordinates):
-                    raise ValueError(f"Invalid normalized coordinates: {label}:{line_number}")
-                if coordinates[2] == 0 or coordinates[3] == 0:
-                    excluded.append({
-                        "file": label.relative_to(source).as_posix(),
-                        "line": line_number,
-                        "annotation": line,
-                        "reason": "zero-area box",
-                    })
-                    continue
-                target = CLASS_MAP[class_id]
-                if target is not None:
-                    remapped.append(" ".join([str(target), *fields[1:]]))
-                    counts[target] += 1
-            text = "\n".join(remapped) + ("\n" if remapped else "")
-            records[image.stem] = (image, game, text, counts)
+            remapped = remap_label_text(
+                label.read_text(encoding="utf-8"),
+                class_map,
+                label_ref=label.relative_to(source).as_posix(),
+            )
+            excluded.extend(remapped.excluded)
+            records[image.stem] = (image, game, remapped.text, remapped.counts)
 
     games = sorted({record[1] for record in records.values()})
     if len(games) < 3:
         raise ValueError("At least three games are required for disjoint splits")
-    random.Random(seed).shuffle(games)
-    held_out_count = max(1, len(games) // 10)
-    splits = {
-        "train": games[2 * held_out_count:],
-        "val": games[:held_out_count],
-        "test": games[held_out_count:2 * held_out_count],
-    }
+    splits = split_groups(games, seed=seed, quarantine=load_quarantine(quarantine_path))
     game_to_split = {game: split for split, group in splits.items() for game in group}
     image_counts = Counter()
     class_counts = {split: Counter() for split in splits}
@@ -99,56 +101,64 @@ def prepare(source: Path, destination: Path, seed: int = 42) -> dict:
     for split in splits:
         (destination / split / "images").mkdir(parents=True)
         (destination / split / "labels").mkdir()
-    data_yaml = yaml.safe_dump({
-        "path": f"/datasets/{destination.name}",
-        "train": "train/images",
-        "val": "val/images",
-        "test": "test/images",
-        "names": TARGET_NAMES,
-    }, sort_keys=False)
-    digest = hashlib.sha256(data_yaml.encode())
     for stem, (image, game, labels, counts) in sorted(records.items()):
         split = game_to_split[game]
-        output_image = destination / split / "images" / image.name
-        shutil.copy2(image, output_image)
+        shutil.copy2(image, destination / split / "images" / image.name)
         (destination / split / "labels" / f"{stem}.txt").write_text(
             labels, encoding="utf-8", newline="\n"
         )
-        with output_image.open("rb") as handle:
-            image_hash = hashlib.file_digest(handle, "sha256").hexdigest()
-        digest.update(f"{split}/{image.name}\0{image_hash}\0{labels}\0".encode())
         image_counts[split] += 1
         class_counts[split].update(counts)
-    (destination / "data.yaml").write_text(data_yaml, encoding="utf-8", newline="\n")
+    (destination / "data.yaml").write_text(
+        data_yaml_text(destination.name, names), encoding="utf-8", newline="\n"
+    )
     manifest = {
         "source_directory": str(source),
-        "source_version": None,
-        "source_license": None,
+        "source_version": source_version,
+        "source_license": license,
         "seed": seed,
         "split_policy": "whole games, 80/10/10",
         "evaluation_domain": "public NBA footage; not the product evaluation set",
-        "class_map": CLASS_MAP,
-        "names": TARGET_NAMES,
+        "class_map": class_map,
+        "names": names,
         "games": {split: sorted(group) for split, group in splits.items()},
         "images": dict(image_counts),
         "boxes": {split: dict(counts) for split, counts in class_counts.items()},
         "excluded_annotations": excluded,
-        "dataset_sha256": digest.hexdigest(),
+        "dataset_sha256": dataset_sha256(destination),
     }
-    (destination / "dataset_manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+    write_manifest(destination, manifest)
+    return manifest
+
+
+def main(argv: list[str] | None = None) -> dict:
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--source", type=Path, default=REPO_ROOT / "datasets/ebard/extracted/yolo")
+    parser.add_argument("--destination", type=Path, default=REPO_ROOT / "datasets/ebard/players_v1")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--classes", type=taxonomy.parse_class_list, default=taxonomy.DEFAULT_CLASSES,
+        help="comma-separated canonical classes in canonical order (default: player,referee)",
     )
+    parser.add_argument("--source-version", default=None, help="pinned eBAR version/revision")
+    parser.add_argument("--license", default=None, help="eBAR license identifier")
+    parser.add_argument("--quarantine", type=Path, default=None,
+                        help="override evalsets/quarantine.yaml")
+    args = parser.parse_args(argv)
+    warn_missing_provenance(args.source_version, args.license)
+    manifest = prepare(
+        args.source, args.destination, args.seed, args.classes,
+        args.source_version, args.license, args.quarantine,
+    )
+    print(f"Prepared {args.destination.resolve()}")
+    print(f"Classes: {manifest['names']}")
+    print(f"Images: {manifest['images']}")
+    print(f"Boxes: {manifest['boxes']}")
+    print(f"Excluded zero-area annotations: {len(manifest['excluded_annotations'])}")
+    print(f"Dataset SHA256: {manifest['dataset_sha256']}")
     return manifest
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", type=Path, default=REPO_ROOT / "datasets/ebard/extracted/yolo")
-    parser.add_argument("--destination", type=Path, default=REPO_ROOT / "datasets/ebard/players_v1")
-    parser.add_argument("--seed", type=int, default=42)
-    args = parser.parse_args()
-    manifest = prepare(args.source, args.destination, args.seed)
-    print(f"Prepared {args.destination.resolve()}")
-    print(f"Images: {manifest['images']}")
-    print(f"Excluded zero-area annotations: {len(manifest['excluded_annotations'])}")
-    print(f"Dataset SHA256: {manifest['dataset_sha256']}")
+    main()

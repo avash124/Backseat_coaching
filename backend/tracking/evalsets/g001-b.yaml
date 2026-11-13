@@ -1,0 +1,16 @@
+# Stopgap detection eval set: g001-b, the quarantined last third of game g001 (batch 1).
+#
+# The labels are uncorrected model PRE-LABELS until a human corrects them in CVAT. Until
+# then, evaluate.py runs on this set only with --diagnostic, and those scores measure
+# agreement with players-v1, not accuracy. After `labeling import-cvat`, point `labels:` at
+# .../g001-b/corrected/labels and set labels_status: corrected.
+name: g001-b
+description: >
+  Every frame of g001-b that the >=4 s spacing rule allows (26 frames, 205.0-308.5 s), from
+  one fixed camera. The players and gym are also in training group g001-a, so this measures
+  within-game generalization only.
+groups: [g001-b]
+images: ../datasets/own/labeling/g001-batch1/g001-b/images
+labels: ../datasets/own/labeling/g001-batch1/g001-b/labels
+labels_status: prelabel
+classes: [player, referee]
